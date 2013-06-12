@@ -31,8 +31,9 @@ class Plugin(object):
     name = None
     _commands = None
 
-    def __init__(self, yakbot):
+    def __init__(self, yakbot, irc):
         self.yakbot = yakbot
+        self.irc = irc
 
     def __hash__(self):
         return hash(self.name)

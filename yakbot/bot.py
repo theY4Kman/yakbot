@@ -14,38 +14,42 @@ class Yakbot(object):
         self.irc = irc
         self.plugins = {}
         self.plugin_commands = defaultdict(list)
-        self.commands = defaultdict(list)
+        self.commands = {}
 
-        self.load_plugin('yakbot.plugins.echo')
+        self._register_meta_commands()
+
+        self.load_plugin('yakbot.plugins.smapi')
 
     def _parse_command(self, message):
         if not message.startswith('!'):
             return None, None
 
         command, _, arg_string = message[1:].partition(' ')
-        args = arg_string.split()
+        args = self._parse_arguments(arg_string)
         return command, args
+
+    def _parse_arguments(self, arg_string):
+        return arg_string.split(' ')
 
     def privmsg(self, nick, channel, message):
         command, args = self._parse_command(message)
         if command:
-            self.eval_command(nick, channel, command, args)
+            self.eval_command(nick, channel, message, command, args)
 
-    def eval_command(self, nick, channel, command, args):
+    def eval_command(self, nick, channel, msg, command, args):
         if command not in self.commands:
             return
 
-        for handler in self.commands[command]:
-            handler(self.irc, channel, nick, args)
+        self.commands[command](channel, nick, msg, args)
 
     def register_command(self, plugin, command, handler):
         """
-        Register a command handler. It should accept four arguments: irc,
-        channel, nick, and args. irc is the IRC client class, used to send
-        messages and the such. args is a list of arguments passed to the command
+        Register a command handler. It should accept four arguments: channel,
+        nick, msg, and args. msg is the complete message string, and args is a
+        list of arguments passed to the command.
         """
         self.plugin_commands[plugin].append((command, handler))
-        self.commands[command].append(handler)
+        self.commands[command] = handler
 
     def _load_plugin(self, name):
         try:
@@ -57,7 +61,7 @@ class Yakbot(object):
                 return False, 'No `plugin_class` global found'
 
             plugin_class = module.plugin_class
-            plugin = plugin_class(self)
+            plugin = plugin_class(self, self.irc)
 
             self.plugins[plugin.name] = plugin
             self._load_plugin_commands(plugin)
@@ -76,6 +80,22 @@ class Yakbot(object):
         for cmdname, handler in plugin._commands:
             bound_handler = handler.__get__(plugin, plugin.__class__)
             self.register_command(plugin, cmdname, bound_handler)
+
+    def _register_meta_commands(self):
+        self.register_command(None, 'help', self._help_command)
+
+    def _help_command(self, channel, nick, msg, args):
+        """Print documentation for a command."""
+        command = ' '.join(args)
+        if command in self.commands:
+            handler = self.commands[command]
+            if handler.__doc__:
+                doc = handler.__doc__
+            else:
+                doc = 'No help found for \x02%s\x02' % command
+            self.irc.msg(channel, '%s: %s' % (nick, doc))
+        else:
+            self.irc.msg(channel, '%s: Command \x02%s\x02 not found' % (nick, command))
 
 
 class YakbotProtocol(irc.IRCClient):
