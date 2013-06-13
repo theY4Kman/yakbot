@@ -12,16 +12,16 @@ RGX_WHITESPACE = re.compile(r'\s+')
 
 class SMAPI(Plugin):
     @command()
-    def smapi(self, channel, nick, msg, args):
+    def smapi(self, irc, msg, args):
         """Lookup a name in the SM API docs."""
-        exact = False
-        arg_string = ' '.join(args).strip()
-        if arg_string[0] == '"' and arg_string[-1] == '"':
-            arg_string = arg_string[1:-1]
+        arg_string = ' '.join(args)
+        if msg.endswith('"%s"' % arg_string):
             exact = True
+        else:
+            exact = False
 
         lookup = self.DO_LOOKUP(arg_string, exact)
-        self.irc.msg(channel, '%s: %s' % (nick, lookup))
+        irc.reply(lookup)
 
     def DO_LOOKUP(self, args, exact=False):
         url = "http://docs.sourcemod.net/api/index.php?action=gethint&id=" + args.replace(" ", "%20")

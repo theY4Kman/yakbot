@@ -6,5 +6,6 @@ from yakbot.bot import YakbotFactory
 if __name__ == '__main__':
     factory = YakbotFactory()
 
+    # TODO: move to config file
     reactor.connectTCP('localhost', 6667, factory)
     reactor.run()

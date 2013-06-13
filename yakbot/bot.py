@@ -1,10 +1,36 @@
 #!/usr/bin/python
+import shlex
 import sys
 from collections import defaultdict
 from importlib import import_module
 
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol
+
+
+class CommandHandlerIRCObject(object):
+    """Provides useful convenience methods for command handlers"""
+
+    # TODO: move to config file
+    REPLY_WITH_NAME = True
+
+    def __init__(self, yakbot, channel, nick):
+        self.yakbot = yakbot
+        self.channel = channel
+        self.nick = nick
+
+    def _build_text_reply(self, msg):
+        if self.REPLY_WITH_NAME:
+            msg = '%s: %s' % (self.nick, msg)
+        return msg
+
+    def reply(self, msg):
+        reply = self._build_text_reply(msg)
+        self.yakbot.irc.msg(self.channel, reply)
+
+    def error(self, msg):
+        # TODO
+        self.reply(msg)
 
 
 class Yakbot(object):
@@ -17,19 +43,24 @@ class Yakbot(object):
         self.commands = {}
 
         self._register_meta_commands()
+        self._load_plugins()
 
-        self.load_plugin('yakbot.plugins.smapi')
+    def _load_plugins(self):
+        # TODO: move to config file
+        for name in ('smapi', 'steamid'):
+            self.load_plugin('yakbot.plugins.%s' % name)
 
     def _parse_command(self, message):
         if not message.startswith('!'):
             return None, None
 
         command, _, arg_string = message[1:].partition(' ')
+        command = command.lower()
         args = self._parse_arguments(arg_string)
         return command, args
 
     def _parse_arguments(self, arg_string):
-        return arg_string.split(' ')
+        return shlex.split(arg_string)
 
     def privmsg(self, nick, channel, message):
         command, args = self._parse_command(message)
@@ -40,13 +71,15 @@ class Yakbot(object):
         if command not in self.commands:
             return
 
-        self.commands[command](channel, nick, msg, args)
+        irc_obj = CommandHandlerIRCObject(self, channel, nick)
+        self.commands[command](irc_obj, msg, args)
 
     def register_command(self, plugin, command, handler):
         """
-        Register a command handler. It should accept four arguments: channel,
-        nick, msg, and args. msg is the complete message string, and args is a
-        list of arguments passed to the command.
+        Register a command handler. It should accept three arguments: irc, msg,
+        and args. irc is an object used to reply to the command, msg is the
+        complete message string, and args is a list of arguments passed to the
+        command.
         """
         self.plugin_commands[plugin].append((command, handler))
         self.commands[command] = handler
@@ -84,23 +117,24 @@ class Yakbot(object):
     def _register_meta_commands(self):
         self.register_command(None, 'help', self._help_command)
 
-    def _help_command(self, channel, nick, msg, args):
+    def _help_command(self, irc, msg, args):
         """Print documentation for a command."""
-        command = ' '.join(args)
+        command = ' '.join(args).lower()
         if command in self.commands:
             handler = self.commands[command]
             if handler.__doc__:
                 doc = handler.__doc__
             else:
                 doc = 'No help found for \x02%s\x02' % command
-            self.irc.msg(channel, '%s: %s' % (nick, doc))
+            irc.reply(doc)
         else:
-            self.irc.msg(channel, '%s: Command \x02%s\x02 not found' % (nick, command))
+            irc.error('Command \x02%s\x02 not found' % command)
 
 
 class YakbotProtocol(irc.IRCClient):
     """ Son of yakbot """
 
+    # TODO: hardcode this even harder
     nickname = 'yakbot'
 
     def connectionMade(self):
@@ -108,6 +142,7 @@ class YakbotProtocol(irc.IRCClient):
         self.yakbot = Yakbot(self)
 
     def signedOn(self):
+        # TODO: move to config file
         self.join('#yakbot')
 
     def privmsg(self, user, channel, message):
