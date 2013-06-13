@@ -7,6 +7,9 @@ from importlib import import_module
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol
 
+from yakbot.ext import Plugin, command
+from yakbot.utils import comma_andify
+
 
 class CommandHandlerIRCObject(object):
     """Provides useful convenience methods for command handlers"""
@@ -33,6 +36,54 @@ class CommandHandlerIRCObject(object):
         self.reply(msg)
 
 
+class _MetaCommandsPlugin(Plugin):
+    private = True
+
+    @command()
+    def help(self, irc, msg, args):
+        """Print documentation for a command."""
+        command = ' '.join(args).lower()
+        if command in self.yakbot.commands:
+            handler = self.yakbot.commands[command]
+            if handler.__doc__:
+                doc = handler.__doc__
+            else:
+                doc = 'No help found for \x02%s\x02' % command
+            irc.reply(doc)
+        else:
+            irc.error('Command \x02%s\x02 not found' % command)
+
+    @command()
+    def list(self, irc, msg, args):
+        if args:
+            plugin_name = args[0]
+            plugin_key = plugin_name.lower()
+            if plugin_key not in self.yakbot.plugins:
+                irc.error('Plug-in \x02%s\x02 not found.' % plugin_name)
+                return
+
+            plugin_commands = self.yakbot.plugin_commands[plugin_key]
+            cmd_names = [name for name,_ in plugin_commands]
+            cmd_readable = comma_andify(cmd_names)
+            num_cmds = len(cmd_names)
+
+            reply = 'Listing %d command%s: %s' % (num_cmds,
+                                                  '' if num_cmds == 1 else 's',
+                                                  cmd_readable)
+            irc.reply(reply)
+        else:
+            plugin_names = [plugin.name
+                            for plugin in self.yakbot.plugins.itervalues()
+                            if not plugin.private]
+            names_readable = comma_andify(plugin_names)
+            length = len(plugin_names)
+
+            reply = 'Listing %d plug-in%s: %s' % (length,
+                                                  '' if length == 1 else 's',
+                                                  names_readable)
+            irc.reply(reply)
+
+
 class Yakbot(object):
     COMMAND_PREFIX = '!'
 
@@ -44,11 +95,6 @@ class Yakbot(object):
 
         self._register_meta_commands()
         self._load_plugins()
-
-    def _load_plugins(self):
-        # TODO: move to config file
-        for name in ('smapi', 'steamid'):
-            self.load_plugin('yakbot.plugins.%s' % name)
 
     def _parse_command(self, message):
         if not message.startswith('!'):
@@ -81,8 +127,13 @@ class Yakbot(object):
         complete message string, and args is a list of arguments passed to the
         command.
         """
-        self.plugin_commands[plugin].append((command, handler))
+        self.plugin_commands[plugin.name.lower()].append((command, handler))
         self.commands[command] = handler
+
+    def _load_plugins(self):
+        # TODO: move to config file
+        for name in ('smapi', 'steamid'):
+            self.load_plugin('yakbot.plugins.%s' % name)
 
     def _load_plugin(self, name):
         try:
@@ -95,11 +146,13 @@ class Yakbot(object):
 
             plugin_class = module.plugin_class
             plugin = plugin_class(self, self.irc)
-
-            self.plugins[plugin.name] = plugin
-            self._load_plugin_commands(plugin)
+            self._init_plugin(plugin)
 
             return True, ''
+
+    def _init_plugin(self, plugin):
+        self.plugins[plugin.name.lower()] = plugin
+        self._load_plugin_commands(plugin)
 
     def load_plugin(self, name):
         print 'Attempting to load plug-in', name
@@ -115,20 +168,8 @@ class Yakbot(object):
             self.register_command(plugin, cmdname, bound_handler)
 
     def _register_meta_commands(self):
-        self.register_command(None, 'help', self._help_command)
-
-    def _help_command(self, irc, msg, args):
-        """Print documentation for a command."""
-        command = ' '.join(args).lower()
-        if command in self.commands:
-            handler = self.commands[command]
-            if handler.__doc__:
-                doc = handler.__doc__
-            else:
-                doc = 'No help found for \x02%s\x02' % command
-            irc.reply(doc)
-        else:
-            irc.error('Command \x02%s\x02 not found' % command)
+        self._meta_plugin = _MetaCommandsPlugin(self, self.irc)
+        self._init_plugin(self._meta_plugin)
 
 
 class YakbotProtocol(irc.IRCClient):

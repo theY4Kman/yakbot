@@ -12,8 +12,12 @@ def command(name=None):
 class PluginMeta(type):
     def __new__(cls, name, bases, attrs):
         plugin = type.__new__(cls, name, bases, attrs)
+        if bases == (object,):
+            # Skip magic for Plugin base class
+            return plugin
+
         if plugin.name is None:
-            plugin.name = name
+            setattr(plugin, 'name', name)
 
         commands = []
         for name, value in attrs.iteritems():
@@ -28,7 +32,9 @@ class PluginMeta(type):
 class Plugin(object):
     __metaclass__ = PluginMeta
 
-    name = None
+    name = None         # Populated with the class name if None
+    private = False     # Whether the plug-in should be hidden in !list
+
     _commands = None
 
     def __init__(self, yakbot, irc):
