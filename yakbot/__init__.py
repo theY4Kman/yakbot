@@ -7,5 +7,5 @@ if __name__ == '__main__':
     factory = YakbotFactory()
 
     # TODO: move to config file
-    reactor.connectTCP('localhost', 6667, factory)
+    reactor.connectTCP('irc.gamesurge.net', 6667, factory)
     reactor.run()

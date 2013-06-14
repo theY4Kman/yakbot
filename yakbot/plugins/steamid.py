@@ -127,8 +127,10 @@ class SteamCommunityProfile:
 
         if self.name is None:
             return '%(steamid)s: %(url)s (or %(commurl)s )' % fmt
-        else:
+        elif self.url:
             return '%(name)s (%(steamid)s): %(url)s (or %(commurl)s )' % fmt
+        else:
+            return '%(name)s (%(steamid)s): %(commurl)s' % fmt
 
     def __str__(self):
         return unicode(self).encode('ascii', 'replace')
@@ -140,13 +142,13 @@ class SteamCommunityProfile:
         url = "http://steamcommunity.com/profiles/%d/?xml=1" % self.commid
         try:
             page = urllib.urlopen(url)
-        except IOError, e:
+        except IOError as e:
             raise SteamIDError(e)
 
         # Retrieve the profile's name from the URL's XML output
         try:
             xmlpage = urllib.urlopen(url)
-        except IOError, e:
+        except IOError as e:
             return
         if xmlpage is None:
             return
@@ -178,7 +180,7 @@ class SteamCommunityProfile:
 
 
 class SteamID(Plugin):
-    @command()
+    @command(aliases=('profile', 'steam'))
     def steamid(self, irc, msg, args):
         """Converts Steam IDs, user IDs, and Community IDs"""
         arg_string = ' '.join(args)

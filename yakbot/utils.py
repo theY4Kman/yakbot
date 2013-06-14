@@ -11,3 +11,7 @@ def comma_andify(seq, sep=', ', and_='and'):
     else:
         items[-1] = '%s %s' % (and_, items[-1])
         return sep.join(items)
+
+
+def pluralize(n, singular='', plural='s'):
+    return singular if n == 1 else plural

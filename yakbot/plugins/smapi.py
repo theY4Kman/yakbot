@@ -11,7 +11,7 @@ RGX_WHITESPACE = re.compile(r'\s+')
 
 
 class SMAPI(Plugin):
-    @command()
+    @command(aliases=('api',))
     def smapi(self, irc, msg, args):
         """Lookup a name in the SM API docs."""
         arg_string = ' '.join(args)

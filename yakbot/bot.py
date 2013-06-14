@@ -8,7 +8,7 @@ from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol
 
 from yakbot.ext import Plugin, command
-from yakbot.utils import comma_andify
+from yakbot.utils import comma_andify, pluralize
 
 
 class CommandHandlerIRCObject(object):
@@ -67,8 +67,7 @@ class _MetaCommandsPlugin(Plugin):
             cmd_readable = comma_andify(cmd_names)
             num_cmds = len(cmd_names)
 
-            reply = 'Listing %d command%s: %s' % (num_cmds,
-                                                  '' if num_cmds == 1 else 's',
+            reply = 'Listing %d command%s: %s' % (num_cmds, pluralize(num_cmds),
                                                   cmd_readable)
             irc.reply(reply)
         else:
@@ -78,8 +77,7 @@ class _MetaCommandsPlugin(Plugin):
             names_readable = comma_andify(plugin_names)
             length = len(plugin_names)
 
-            reply = 'Listing %d plug-in%s: %s' % (length,
-                                                  '' if length == 1 else 's',
+            reply = 'Listing %d plug-in%s: %s' % (length, pluralize(length),
                                                   names_readable)
             irc.reply(reply)
 
@@ -89,11 +87,13 @@ class Yakbot(object):
 
     def __init__(self, irc):
         self.irc = irc
+
         self.plugins = {}
         self.plugin_commands = defaultdict(list)
         self.commands = {}
+        self.aliases = {}
 
-        self._register_meta_commands()
+        self._register_meta_plugin()
         self._load_plugins()
 
     def _parse_command(self, message):
@@ -111,6 +111,8 @@ class Yakbot(object):
     def privmsg(self, nick, channel, message):
         command, args = self._parse_command(message)
         if command:
+            if command in self.aliases:
+                command = self.aliases[command]
             self.eval_command(nick, channel, message, command, args)
 
     def eval_command(self, nick, channel, msg, command, args):
@@ -120,7 +122,7 @@ class Yakbot(object):
         irc_obj = CommandHandlerIRCObject(self, channel, nick)
         self.commands[command](irc_obj, msg, args)
 
-    def register_command(self, plugin, command, handler):
+    def register_command(self, plugin, command, handler, aliases=()):
         """
         Register a command handler. It should accept three arguments: irc, msg,
         and args. irc is an object used to reply to the command, msg is the
@@ -130,14 +132,17 @@ class Yakbot(object):
         self.plugin_commands[plugin.name.lower()].append((command, handler))
         self.commands[command] = handler
 
+        for alias in aliases:
+            self.aliases[alias] = command
+
     def _load_plugins(self):
         # TODO: move to config file
-        for name in ('smapi', 'steamid'):
+        for name in ('smapi', 'steamid', 'smplugins'):
             self.load_plugin('yakbot.plugins.%s' % name)
 
-    def _load_plugin(self, name):
+    def _load_plugin(self, module_name):
         try:
-            module = import_module(name)
+            module = import_module(module_name)
         except ImportError as err:
             return False, 'Import error: %s' % err.message
         else:
@@ -149,6 +154,11 @@ class Yakbot(object):
             self._init_plugin(plugin)
 
             return True, ''
+
+    def _unload_plugin(self, plugin_name):
+        plugin_key = plugin_name.lower()
+        if plugin_key not in self.plugins:
+            return False, 'Plugin not found'
 
     def _init_plugin(self, plugin):
         self.plugins[plugin.name.lower()] = plugin
@@ -163,11 +173,11 @@ class Yakbot(object):
             print 'Error:', message
 
     def _load_plugin_commands(self, plugin):
-        for cmdname, handler in plugin._commands:
+        for cmdname, handler, aliases in plugin._commands:
             bound_handler = handler.__get__(plugin, plugin.__class__)
-            self.register_command(plugin, cmdname, bound_handler)
+            self.register_command(plugin, cmdname, bound_handler, aliases)
 
-    def _register_meta_commands(self):
+    def _register_meta_plugin(self):
         self._meta_plugin = _MetaCommandsPlugin(self, self.irc)
         self._init_plugin(self._meta_plugin)
 
@@ -182,13 +192,24 @@ class YakbotProtocol(irc.IRCClient):
         irc.IRCClient.connectionMade(self)
         self.yakbot = Yakbot(self)
 
+    def connectionLost(self, reason):
+        irc.IRCClient.connectionLost(self, reason)
+        print 'Disconnected:', reason
+
     def signedOn(self):
         # TODO: move to config file
-        self.join('#yakbot')
+        for channel in ('#yakbot', '#sourcemod'):
+            self.join(channel)
+
+    def joined(self, channel):
+        print 'Joined', channel
 
     def privmsg(self, user, channel, message):
         nick = user.split('!', 1)[0]
         self.yakbot.privmsg(nick, channel, message)
+
+    def alterCollidedNick(self, nickname):
+        return nickname + '`'
 
 
 class YakbotFactory(protocol.ClientFactory):
