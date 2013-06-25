@@ -155,7 +155,7 @@ class SteamCommunityProfile:
 
         try:
             doc = minidom.parse(xmlpage)
-        except ExpatError, e:
+        except ExpatError as e:
             raise SteamIDError(e)
         if doc is None:
             return

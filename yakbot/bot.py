@@ -137,7 +137,7 @@ class Yakbot(object):
 
     def _load_plugins(self):
         # TODO: move to config file
-        for name in ('smapi', 'steamid', 'smplugins'):
+        for name in ('smapi', 'steamid', 'smplugins', 'zachbraffquotes'):
             self.load_plugin('yakbot.plugins.%s' % name)
 
     def _load_plugin(self, module_name):
