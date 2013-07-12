@@ -125,7 +125,7 @@ class SMBugs(Plugin):
         context['num_comments'] = len(comments)
         context['num_comments_plural'] = '' if len(comments) == 1 else 's'
 
-        fmt = ('#%(id)d: %(short_desc)s '
+        fmt = ('#%(id)d [%(product)s]: %(short_desc)s '
                '[%(num_comments)s comment%(num_comments_plural)s] ( %(url)s )')
         irc.reply((fmt % context).encode('ascii', 'replace'))
 
