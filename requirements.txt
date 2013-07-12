@@ -1,1 +1,2 @@
-twisted
+Twisted==13.1.0
+PyYAML==3.10

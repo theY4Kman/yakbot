@@ -14,16 +14,14 @@ from yakbot.utils import comma_andify, pluralize
 class CommandHandlerIRCObject(object):
     """Provides useful convenience methods for command handlers"""
 
-    # TODO: move to config file
-    REPLY_WITH_NAME = True
-
     def __init__(self, yakbot, channel, nick):
         self.yakbot = yakbot
+        self.settings = self.yakbot.settings
         self.channel = channel
         self.nick = nick
 
     def _build_text_reply(self, msg):
-        if self.REPLY_WITH_NAME:
+        if self.settings['reply-with-name']:
             msg = '%s: %s' % (self.nick, msg)
         return msg
 
@@ -41,7 +39,11 @@ class _MetaCommandsPlugin(Plugin):
 
     @command()
     def help(self, irc, msg, args):
-        """Print documentation for a command."""
+        """Print documentation for a command. Usage: help <command>"""
+        if not args:
+            irc.reply(self.yakbot.commands['help'].__doc__)
+            return
+
         command = ' '.join(args).lower()
         if command in self.yakbot.commands:
             handler = self.yakbot.commands[command]
@@ -87,6 +89,7 @@ class Yakbot(object):
 
     def __init__(self, irc):
         self.irc = irc
+        self.settings = irc.settings
 
         self.plugins = {}
         self.plugin_commands = defaultdict(list)
@@ -136,8 +139,7 @@ class Yakbot(object):
             self.aliases[alias] = command
 
     def _load_plugins(self):
-        # TODO: move to config file
-        for name in ('smapi', 'steamid', 'smplugins'):
+        for name in self.settings['plugins']:
             self.load_plugin('yakbot.plugins.%s' % name)
 
     def _load_plugin(self, module_name):
@@ -185,8 +187,12 @@ class Yakbot(object):
 class YakbotProtocol(irc.IRCClient):
     """ Son of yakbot """
 
-    # TODO: hardcode this even harder
-    nickname = 'yakbot'
+    def __init__(self, settings):
+        self.settings = settings
+
+    @property
+    def nickname(self):
+        return self.settings['nickname']
 
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
@@ -197,8 +203,7 @@ class YakbotProtocol(irc.IRCClient):
         print 'Disconnected:', reason
 
     def signedOn(self):
-        # TODO: move to config file
-        for channel in ('#yakbot', '#sourcemod'):
+        for channel in self.settings['channels']:
             self.join(channel)
 
     def joined(self, channel):
@@ -213,8 +218,11 @@ class YakbotProtocol(irc.IRCClient):
 
 
 class YakbotFactory(protocol.ClientFactory):
+    def __init__(self, settings):
+        self.settings = settings
+
     def buildProtocol(self, addr):
-        yakbot = YakbotProtocol()
+        yakbot = YakbotProtocol(self.settings)
         yakbot.factory = self
         return yakbot
 

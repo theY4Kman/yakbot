@@ -1,2 +1,2 @@
 #!/bin/sh
-python -m yakbot.__init__
+python -m yakbot.__init__ -c yakbot.yaml
