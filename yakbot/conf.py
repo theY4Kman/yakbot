@@ -41,8 +41,10 @@ class Settings(IterableUserDict):
             nickname: yakbot
             plugins:
             - smapi
-            - steamid
+            - smbugs
             - smplugins
+            - steamid
+            - zachbraffquotes
             reply-with-name: true
         ''')
 

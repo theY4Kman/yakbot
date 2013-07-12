@@ -123,7 +123,12 @@ class Yakbot(object):
             return
 
         irc_obj = CommandHandlerIRCObject(self, channel, nick)
-        self.commands[command](irc_obj, msg, args)
+
+        try:
+            self.commands[command](irc_obj, msg, args)
+        except Exception:
+            irc_obj.error("Oooops, I've become self-aware. I just felt an error.")
+            raise
 
     def register_command(self, plugin, command, handler, aliases=()):
         """
@@ -167,7 +172,7 @@ class Yakbot(object):
         self._load_plugin_commands(plugin)
 
     def load_plugin(self, name):
-        print 'Attempting to load plug-in', name
+        print 'Attempting to load plug-in', name + '...',
         success, message = self._load_plugin(name)
         if success:
             print 'Success!'

@@ -449,7 +449,7 @@ class ZachBraffQuotes(Plugin):
     Prints random quotes extracted from zachbraffquotes.com
     """
 
-    @command()
+    @command
     def zbq(self, irc, msg, args):
         irc.reply(random.choice(quotes))
 

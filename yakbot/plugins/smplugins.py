@@ -28,7 +28,6 @@ def plugin_search(title=None, author=None, approved=None):
 
 
 class SMPlugins(Plugin):
-
     @command(aliases=('pl',))
     def plugins(self, irc, msg, args):
         """<plug-in title>"""

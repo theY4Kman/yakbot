@@ -4,10 +4,19 @@ ALIASES_ATTR = '__aliases__'
 
 def command(name=None, aliases=()):
     """ Decorator to register a command handler in a Plugin. """
+    fn = None
+    if callable(name):
+        fn = name
+        name = None
+
     def _command(fn):
         setattr(fn, CMDNAME_ATTR, fn.__name__ if name is None else name)
         setattr(fn, ALIASES_ATTR, aliases)
         return fn
+
+    if fn:
+        return _command(fn)
+
     return _command
 
 
