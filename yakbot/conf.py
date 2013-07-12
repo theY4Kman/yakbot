@@ -4,24 +4,33 @@ from UserDict import IterableUserDict
 import yaml
 
 
+def recursive_dict_update(d, u):
+    """http://stackoverflow.com/a/3233356/148585"""
+    for k, v in u.iteritems():
+        if isinstance(v, dict):
+            r = recursive_dict_update(d.get(k, {}), v)
+            d[k] = r
+        else:
+            d[k] = u[k]
+    return d
+
+
 class Settings(IterableUserDict):
     def __init__(self, path):
         self.path = path
         self.data = {}
 
-        if not self._load_file(self.path):
-            self._load_defaults()
+        self._load_defaults()
+        self._load_file(self.path)
 
     def _load_file(self, path):
         if not os.path.exists(path):
             return False
         with open(path) as fp:
-            self.data = yaml.safe_load(fp)
+            recursive_dict_update(self.data, yaml.safe_load(fp))
         return True
 
     def _load_defaults(self):
-        # TODO: load this first, and have _load_file recursively update self.data
-        # Note "recursive". An update() will no descend into dicts, losing data
         self.data = yaml.safe_load('''
             channels:
             - '#sourcemod'
