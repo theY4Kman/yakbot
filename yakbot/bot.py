@@ -219,7 +219,7 @@ class YakbotProtocol(irc.IRCClient):
             account = self.settings['auth'].get('account', self.nickname)
             password = self.settings['auth'].get('password', '')
             auth_user = self.settings['auth'].get('auth_user', DEFAULT_AUTHSERV)
-            self.msg(auth_user, 'AUTH %s %s' % (account, password))
+            self.msg(auth_user, 'IDENTIFY %s %s' % (account, password))
 
     def join_channels(self):
         for channel in self.settings['channels']:
