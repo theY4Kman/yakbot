@@ -11,6 +11,9 @@ from yakbot.ext import Plugin, command
 from yakbot.utils import comma_andify, pluralize
 
 
+DEFAULT_AUTHSERV = 'AuthServ@Services.GameSurge.net'
+
+
 class CommandHandlerIRCObject(object):
     """Provides useful convenience methods for command handlers"""
 
@@ -208,6 +211,17 @@ class YakbotProtocol(irc.IRCClient):
         print 'Disconnected:', reason
 
     def signedOn(self):
+        self.auth()
+        self.join_channels()
+
+    def auth(self):
+        if 'auth' in self.settings:
+            account = self.settings['auth'].get('account', self.nickname)
+            password = self.settings['auth'].get('password', '')
+            auth_user = self.settings['auth'].get('auth_user', DEFAULT_AUTHSERV)
+            self.msg(auth_user, 'AUTH %s %s' % (account, password))
+
+    def join_channels(self):
         for channel in self.settings['channels']:
             self.join(channel)
 
